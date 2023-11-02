@@ -236,6 +236,7 @@ struct MathApp {
     current_function: CurrentFunction,
     functions: Vec<Function>,
     theme: Theme,
+    help_opened: bool,
 }
 
 struct Function {
@@ -355,6 +356,7 @@ impl MathApp {
                 Function::new("0.1x^2 - xln(x)", -1.0, 1.0, 0.001, CurrentFunction::Fourth),
             ],
             theme: LATTE,
+            help_opened: false,
         }
     }
 }
@@ -378,6 +380,13 @@ impl eframe::App for MathApp {
                 ui.with_layout(
                     egui::Layout::right_to_left(eframe::emath::Align::RIGHT),
                     |ui| {
+                        if ui.add(egui::Button::new("HELP")).clicked() {
+                            self.help_opened = if self.help_opened == false {
+                                true
+                            } else {
+                                false
+                            };
+                        }
                         if ui
                             .add(egui::Button::new(format!(
                                 "Theme: {}",
@@ -602,28 +611,23 @@ impl eframe::App for MathApp {
             egui_plot::Plot::new("My Plot")
                 .legend(egui_plot::Legend::default())
                 .show(ui, |plot_ui| {
-                    // let mut x_vec: [f64; 2] = [0.0, 0.0];
-                    // if match self.functions[current_function]
-                    //     .current_plot_vec
-                    //     .get("lines_x2")
-                    // {
-                    //     Some(lines) => {
-                    //         if lines.len() != 0 {
-                    //             x_vec = lines[1];
-                    //         }
-                    //         true
-                    //     }
-                    //     None => false,
-                    // } {
-                    //     plot_ui.text(
-                    //         egui_plot::Text::new(
-                    //             egui_plot::PlotPoint::from(x_vec),
-                    //             format!("{}", self.functions[current_function].x2),
-                    //         )
-                    //         .color(self.theme.text)
-                    //         .name("x"),
-                    //     );
-                    // }
+                    let mut is_x1_line: bool = true;
+                    for line in self.functions[current_function].lines.clone().into_iter() {
+                        if is_x1_line {
+                            plot_ui.line(
+                                egui_plot::Line::new(egui_plot::PlotPoints::from(line))
+                                    .color(self.theme.green)
+                                    .name("Showcase"),
+                            );
+                        } else {
+                            plot_ui.line(
+                                egui_plot::Line::new(egui_plot::PlotPoints::from(line))
+                                    .color(self.theme.teal)
+                                    .name("Showcase"),
+                            );
+                        };
+                        is_x1_line = !is_x1_line;
+                    }
                     plot_ui.line(
                         egui_plot::Line::new(egui_plot::PlotPoints::from(
                             match self.functions[current_function]
@@ -636,32 +640,6 @@ impl eframe::App for MathApp {
                         ))
                         .color(self.theme.red)
                         .name(self.functions[current_function].title.as_str()),
-                    );
-                    plot_ui.line(
-                        egui_plot::Line::new(egui_plot::PlotPoints::from(
-                            match self.functions[current_function]
-                                .current_plot_vec
-                                .get("lines_x1")
-                            {
-                                Some(lines) => lines.clone(),
-                                None => vec![],
-                            },
-                        ))
-                        .color(self.theme.teal)
-                        .name("Showcase"),
-                    );
-                    plot_ui.line(
-                        egui_plot::Line::new(egui_plot::PlotPoints::from(
-                            match self.functions[current_function]
-                                .current_plot_vec
-                                .get("lines_x2")
-                            {
-                                Some(lines) => lines.clone(),
-                                None => vec![],
-                            },
-                        ))
-                        .color(self.theme.green)
-                        .name("Showcase"),
                     );
                     plot_ui.line(
                         egui_plot::Line::new(egui_plot::PlotPoints::from(
@@ -705,11 +683,8 @@ impl eframe::App for MathApp {
                             self.functions[current_function].x2 = answer.x2;
                             self.functions[current_function].reached_eps = answer.reached_eps;
                             self.functions[current_function]
-                                .current_plot_vec
-                                .insert(String::from("lines_x1"), answer.lines[0].clone());
-                            self.functions[current_function]
-                                .current_plot_vec
-                                .insert(String::from("lines_x2"), answer.lines[1].clone());
+                                .lines
+                                .append(&mut answer.lines.clone());
                         }
                         None => {
                             self.functions[current_function].is_error = true;
@@ -735,22 +710,12 @@ impl eframe::App for MathApp {
                                 self.functions[current_function].fixed = answer.fixed;
                                 self.functions[current_function].x2 = answer.x2;
                                 self.functions[current_function].current_iteration += 1;
-                                let lines: Vec<[f64; 2]> = match self.functions[current_function]
-                                    .current_plot_vec
-                                    .get("lines_x2")
-                                {
-                                    Some(lines) => lines.clone(),
-                                    None => vec![],
-                                };
+                                self.functions[current_function]
+                                    .lines
+                                    .append(&mut answer.lines.clone());
                                 if answer.reached_eps {
                                     self.functions[current_function].reached_eps =
                                         answer.reached_eps;
-                                    self.functions[current_function]
-                                        .current_plot_vec
-                                        .insert(String::from("lines_x1"), answer.lines[0].clone());
-                                    self.functions[current_function]
-                                        .current_plot_vec
-                                        .insert(String::from("lines_x2"), answer.lines[1].clone());
                                     break;
                                 }
                             }
@@ -769,6 +734,11 @@ impl eframe::App for MathApp {
                 }
             });
         });
+        egui::Window::new("Help")
+            .open(&mut self.help_opened)
+            .show(ctx, |ui| {
+                ui.label("");
+            });
     }
 }
 
